@@ -47,6 +47,95 @@
 
 using namespace DriverFramework;
 
+
+// Accelerometer and gyroscope self test; check calibration wrt factory settings
+void MPU9250::self_test(float
+			*destination)  // Should return percent deviation from factory trim values, +/- 14 or less deviation is a pass
+{
+	uint8_t rawData[6] = {0, 0, 0, 0, 0, 0};
+	uint8_t selfTest[6];
+	int16_t gAvg[3], aAvg[3], aSTAvg[3], gSTAvg[3];
+	float factoryTrim[6];
+	uint8_t FS = 0;
+
+	_writeReg(MPUREG_SMPLRT_DIV, 0x00);    // Set gyro sample rate to 1 kHz
+	_writeReg(MPUREG_CONFIG, 0x02);        // Set gyro sample rate to 1 kHz and DLPF to 92 Hz
+	_writeReg(MPUREG_GYRO_CONFIG, 1 << FS); // Set full scale range for the gyro to 250 dps
+	_writeReg(MPUREG_ACCEL_CONFIG2, 0x02); // Set accelerometer rate to 1 kHz and bandwidth to 92 Hz
+	_writeReg(MPUREG_ACCEL_CONFIG, 1 << FS); // Set full scale range for the accelerometer to 2 g
+
+	for (int ii = 0; ii < 200; ii++) {  // get average current values of gyro and acclerometer
+		_bulkRead(MPUREG_ACCEL_XOUT_H, &rawData[0], 6);        // Read the six raw data registers into data array
+		aAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
+		aAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+		aAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
+
+		_bulkRead(MPUREG_GYRO_XOUT_H, &rawData[0], 6);       // Read the six raw data registers sequentially into data array
+		gAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
+		gAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+		gAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
+	}
+
+	for (int ii = 0; ii < 3; ii++) { // Get average of 200 values and store as average current readings
+		aAvg[ii] /= 200;
+		gAvg[ii] /= 200;
+	}
+
+	// Configure the accelerometer for self-test
+	_writeReg(MPUREG_ACCEL_CONFIG, 0xE0); // Enable self test on all three axes and set accelerometer range to +/- 2 g
+	_writeReg(MPUREG_GYRO_CONFIG,  0xE0); // Enable self test on all three axes and set gyro range to +/- 250 degrees/s
+	usleep(25000);  // Delay a while to let the device stabilize
+
+	for (int ii = 0; ii < 200; ii++) {  // get average self-test values of gyro and acclerometer
+		_bulkRead(MPUREG_ACCEL_XOUT_H, &rawData[0], 6);  // Read the six raw data registers into data array
+		aSTAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
+		aSTAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+		aSTAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
+
+		_bulkRead(MPUREG_GYRO_XOUT_H, &rawData[0], 6);  // Read the six raw data registers sequentially into data array
+		gSTAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
+		gSTAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+		gSTAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
+	}
+
+	for (int ii = 0; ii < 3; ii++) { // Get average of 200 values and store as average self-test readings
+		aSTAvg[ii] /= 200;
+		gSTAvg[ii] /= 200;
+	}
+
+	// Configure the gyro and accelerometer for normal operation
+	_writeReg(MPUREG_ACCEL_CONFIG, 0x00);
+	_writeReg(MPUREG_GYRO_CONFIG,  0x00);
+	usleep(25000);  // Delay a while to let the device stabilize
+
+	// Retrieve accelerometer and gyro factory Self-Test Code from USR_Reg
+	_readReg(MPUREG_SELF_TEST_X_ACCEL, selfTest[0]); // X-axis accel self-test results
+	DF_LOG_ERR("selfTest[0]: %i", selfTest[0]);
+	_readReg(MPUREG_SELF_TEST_Y_ACCEL, selfTest[1]); // Y-axis accel self-test results
+	_readReg(MPUREG_SELF_TEST_Z_ACCEL, selfTest[2]); // Z-axis accel self-test results
+	_readReg(MPUREG_SELF_TEST_X_GYRO, selfTest[3]);  // X-axis gyro self-test results
+	_readReg(MPUREG_SELF_TEST_Y_GYRO, selfTest[4]);  // Y-axis gyro self-test results
+	_readReg(MPUREG_SELF_TEST_Z_GYRO, selfTest[5]);  // Z-axis gyro self-test results
+
+	// Retrieve factory self-test value from self-test code reads
+	factoryTrim[0] = (float)(2620 / 1 << FS) * (pow(1.01 , ((float)selfTest[0] - 1.0))); // FT[Xa] factory trim calculation
+	factoryTrim[1] = (float)(2620 / 1 << FS) * (pow(1.01 , ((float)selfTest[1] - 1.0))); // FT[Ya] factory trim calculation
+	factoryTrim[2] = (float)(2620 / 1 << FS) * (pow(1.01 , ((float)selfTest[2] - 1.0))); // FT[Za] factory trim calculation
+	factoryTrim[3] = (float)(2620 / 1 << FS) * (pow(1.01 , ((float)selfTest[3] - 1.0))); // FT[Xg] factory trim calculation
+	factoryTrim[4] = (float)(2620 / 1 << FS) * (pow(1.01 , ((float)selfTest[4] - 1.0))); // FT[Yg] factory trim calculation
+	factoryTrim[5] = (float)(2620 / 1 << FS) * (pow(1.01 , ((float)selfTest[5] - 1.0))); // FT[Zg] factory trim calculation
+
+	// Report results as a ratio of (STR - FT)/FT; the change from Factory Trim of the Self-Test Response
+	// To get percent, must multiply by 100
+	for (int i = 0; i < 3; i++) {
+		DF_LOG_ERR("aSTAvg[%i] = %i", i, aSTAvg[i]);
+		DF_LOG_ERR("aAvg[%i] = %i", i, aAvg[i]);
+		DF_LOG_ERR("factoryTrim[%i] = %f", i, factoryTrim[i]);
+		destination[i]   = 100.0 * ((float)(aSTAvg[i] - aAvg[i])) / factoryTrim[i]; // Report percent differences
+		destination[i + 3] = 100.0 * ((float)(gSTAvg[i] - gAvg[i])) / factoryTrim[i + 3]; // Report percent differences
+	}
+}
+
 int MPU9250::mpu9250_init()
 {
 	// Use 1 MHz for normal registers.
@@ -175,6 +264,14 @@ int MPU9250::mpu9250_init()
 	if (result != 0) {
 		DF_LOG_ERR("config failed");
 	}
+
+	usleep(1000);
+
+	float deviation[6];
+	self_test(deviation);
+	DF_LOG_ERR("deviation is: %f, %f, %f, %f, %f, %f", deviation[0],
+		   deviation[1], deviation[2], deviation[3],
+		   deviation[4], deviation[5]);
 
 	usleep(1000);
 

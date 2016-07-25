@@ -38,6 +38,12 @@
 
 namespace DriverFramework
 {
+#define MPUREG_SELF_TEST_X_GYRO	0x00
+#define MPUREG_SELF_TEST_Y_GYRO	0x01
+#define MPUREG_SELF_TEST_Z_GYRO	0x02
+#define MPUREG_SELF_TEST_X_ACCEL	0x0D
+#define MPUREG_SELF_TEST_Y_ACCEL	0x0E
+#define MPUREG_SELF_TEST_Z_ACCEL	0x0F
 #define MPUREG_WHOAMI			0x75
 #define MPUREG_SMPLRT_DIV		0x19
 #define MPUREG_CONFIG			0x1A
@@ -288,6 +294,8 @@ private:
 	void reset_fifo();
 
 	void clear_int_status();
+
+	void self_test(float *deviation);
 
 	float _last_temp_c;
 	bool _temp_initialized;
