@@ -54,7 +54,7 @@ void MPU9250::self_test(float
 {
 	uint8_t rawData[6] = {0, 0, 0, 0, 0, 0};
 	uint8_t selfTest[6];
-	int16_t gAvg[3], aAvg[3], aSTAvg[3], gSTAvg[3];
+	int32_t gAvg[3] = {0}, aAvg[3] = {0}, aSTAvg[3] = {0}, gSTAvg[3] = {0};
 	float factoryTrim[6];
 	uint8_t FS = 0;
 
@@ -131,8 +131,8 @@ void MPU9250::self_test(float
 		DF_LOG_ERR("aSTAvg[%i] = %i", i, aSTAvg[i]);
 		DF_LOG_ERR("aAvg[%i] = %i", i, aAvg[i]);
 		DF_LOG_ERR("factoryTrim[%i] = %f", i, factoryTrim[i]);
-		destination[i]   = 100.0 * ((float)(aSTAvg[i] - aAvg[i])) / factoryTrim[i]; // Report percent differences
-		destination[i + 3] = 100.0 * ((float)(gSTAvg[i] - gAvg[i])) / factoryTrim[i + 3]; // Report percent differences
+		destination[i]   = 100.0 * (((float)(aSTAvg[i] - aAvg[i])) / factoryTrim[i]) - 100.0; // Report percent differences
+		destination[i + 3] = 100.0 * (((float)(gSTAvg[i] - gAvg[i])) / factoryTrim[i + 3]) - 100.0;
 	}
 }
 
