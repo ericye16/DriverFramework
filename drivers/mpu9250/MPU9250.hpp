@@ -309,6 +309,8 @@ private:
 
 	void self_test(float *deviation);
 
+	void calibrate_flat();
+
 	void set_offsets();
 
 	float _last_temp_c;

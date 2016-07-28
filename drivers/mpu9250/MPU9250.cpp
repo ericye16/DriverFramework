@@ -84,7 +84,7 @@ void MPU9250::set_offsets()
 	_bulkRead(MPUREG_XA_OFFS_H, (uint8_t *)&accel_offsets[0], 2);
 	_bulkRead(MPUREG_YA_OFFS_H, (uint8_t *)&accel_offsets[1], 2);
 	_bulkRead(MPUREG_ZA_OFFS_H, (uint8_t *)&accel_offsets[2], 2);
-	
+
 	usleep(25000);
 
 	accel_offsets[0] = swap16(accel_offsets[0]);
@@ -94,6 +94,66 @@ void MPU9250::set_offsets()
 	DF_LOG_ERR("accel_offsets[1] = %i", accel_offsets[1]);
 	DF_LOG_ERR("accel_offsets[2] = %i", accel_offsets[2]);
 
+}
+
+void MPU9250::calibrate_flat()
+{
+	uint8_t data[12];
+	int32_t aAvg[3] = {0};
+
+	uint16_t accelsensitivity = 2048; // = 2048 LSB/g
+	for (int ii = 0; ii < 200; ii++) {
+		_bulkRead(MPUREG_ACCEL_XOUT_H, &data[0], 6);
+		aAvg[0] += (int16_t)(((int16_t)data[0] << 8) | data[1]) ;
+		aAvg[1] += (int16_t)(((int16_t)data[2] << 8) | data[3]) ;
+		aAvg[2] += (int16_t)(((int16_t)data[4] << 8) | data[5]) ;
+	}
+	aAvg[0] /= 200;
+	aAvg[1] /= 200;
+	aAvg[2] /= 200;
+
+	if (aAvg[2] > 0) {
+		aAvg[2] -= accelsensitivity;
+	} else {
+		aAvg[2] += accelsensitivity;
+	}
+
+	int32_t accel_bias_reg[3] = {0};
+	uint8_t mask = 0x01;
+	uint8_t mask_bit[3] = {0};
+	_bulkRead(MPUREG_XA_OFFS_H, &data[0], 2);
+	accel_bias_reg[0] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+	_bulkRead(MPUREG_YA_OFFS_H, &data[0], 2);
+	accel_bias_reg[1] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+	_bulkRead(MPUREG_ZA_OFFS_H, &data[0], 2);
+	accel_bias_reg[2] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+
+	mask_bit[0] = accel_bias_reg[0] & mask;
+	mask_bit[1] = accel_bias_reg[1] & mask;
+	mask_bit[2] = accel_bias_reg[2] & mask;
+
+	DF_LOG_ERR("accel_bias_reg: %i, %i, %i", accel_bias_reg[0], accel_bias_reg[1], accel_bias_reg[2]);
+	DF_LOG_ERR("aAvg: %i, %i, %i", aAvg[0], aAvg[1], aAvg[2]);
+	accel_bias_reg[0] -= aAvg[0];
+	accel_bias_reg[1] -= aAvg[1];
+	accel_bias_reg[2] -= aAvg[2];
+
+	data[0] = (accel_bias_reg[0] >> 8) & 0xFF;
+	data[1] = (accel_bias_reg[0]) & 0xFF;
+	// data[1] = data[1] | mask_bit[0];
+	data[2] = (accel_bias_reg[1] >> 8) & 0xFF;
+	data[3] = (accel_bias_reg[1]) & 0xFF;
+	// data[3] = data[3] | mask_bit[1];
+	data[4] = (accel_bias_reg[2] >> 8) & 0xFF;
+	data[5] = (accel_bias_reg[2]) & 0xFF;
+	// data[5] = data[5] | mask_bit[2];
+
+	_writeReg(MPUREG_XA_OFFS_H, data[0]);
+	_writeReg(MPUREG_XA_OFFS_L, data[1]);
+	_writeReg(MPUREG_YA_OFFS_H, data[2]);
+	_writeReg(MPUREG_YA_OFFS_L, data[3]);
+	_writeReg(MPUREG_ZA_OFFS_H, data[4]);
+	_writeReg(MPUREG_ZA_OFFS_L, data[5]);
 }
 
 // Accelerometer and gyroscope self test; check calibration wrt factory settings
@@ -321,8 +381,6 @@ int MPU9250::mpu9250_init()
 		   deviation[1], deviation[2], deviation[3],
 		   deviation[4], deviation[5]);
 
-	// set_offsets();
-
 	usleep(1000);
 
 	result = _writeReg(MPUREG_GYRO_CONFIG, BITS_FS_2000DPS | BITS_BW_LT3600HZ);
@@ -368,6 +426,10 @@ int MPU9250::mpu9250_init()
 		}
 	}
 
+
+	calibrate_flat();
+
+	usleep(1000);
 	// Enable/clear the FIFO of any residual data
 	reset_fifo();
 
