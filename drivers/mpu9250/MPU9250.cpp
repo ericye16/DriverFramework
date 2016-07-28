@@ -47,6 +47,54 @@
 
 using namespace DriverFramework;
 
+void MPU9250::set_offsets()
+{
+	int16_t accel_offsets[3] = {};
+	_bulkRead(MPUREG_XA_OFFS_H, (uint8_t *)&accel_offsets[0], 2);
+	_bulkRead(MPUREG_YA_OFFS_H, (uint8_t *)&accel_offsets[1], 2);
+	_bulkRead(MPUREG_ZA_OFFS_H, (uint8_t *)&accel_offsets[2], 2);
+
+	accel_offsets[0] = swap16(accel_offsets[0]);
+	accel_offsets[1] = swap16(accel_offsets[1]);
+	accel_offsets[2] = swap16(accel_offsets[2]);
+	DF_LOG_ERR("accel_offsets[0] = %i", accel_offsets[0]);
+	DF_LOG_ERR("accel_offsets[1] = %i", accel_offsets[1]);
+	DF_LOG_ERR("accel_offsets[2] = %i", accel_offsets[2]);
+
+	usleep(25000);
+
+	int16_t x_reading;
+	_bulkRead(MPUREG_ACCEL_XOUT_H, (uint8_t *)&x_reading, 2);
+	swap16(x_reading);
+	DF_LOG_ERR("reading before zeroing accel %i", x_reading);
+
+	usleep(25000);
+
+	_writeReg(MPUREG_XA_OFFS_H, 0);
+	_writeReg(MPUREG_XA_OFFS_L, 0);
+
+	usleep(25000);
+
+	_bulkRead(MPUREG_ACCEL_XOUT_H, (uint8_t *)&x_reading, 2);
+	swap16(x_reading);
+	DF_LOG_ERR("reading after zeroing accel %i", x_reading);
+
+	usleep(25000);
+
+	_bulkRead(MPUREG_XA_OFFS_H, (uint8_t *)&accel_offsets[0], 2);
+	_bulkRead(MPUREG_YA_OFFS_H, (uint8_t *)&accel_offsets[1], 2);
+	_bulkRead(MPUREG_ZA_OFFS_H, (uint8_t *)&accel_offsets[2], 2);
+	
+	usleep(25000);
+
+	accel_offsets[0] = swap16(accel_offsets[0]);
+	accel_offsets[1] = swap16(accel_offsets[1]);
+	accel_offsets[2] = swap16(accel_offsets[2]);
+	DF_LOG_ERR("accel_offsets[0] = %i", accel_offsets[0]);
+	DF_LOG_ERR("accel_offsets[1] = %i", accel_offsets[1]);
+	DF_LOG_ERR("accel_offsets[2] = %i", accel_offsets[2]);
+
+}
 
 // Accelerometer and gyroscope self test; check calibration wrt factory settings
 void MPU9250::self_test(float
@@ -273,6 +321,8 @@ int MPU9250::mpu9250_init()
 		   deviation[1], deviation[2], deviation[3],
 		   deviation[4], deviation[5]);
 
+	// set_offsets();
+
 	usleep(1000);
 
 	result = _writeReg(MPUREG_GYRO_CONFIG, BITS_FS_2000DPS | BITS_BW_LT3600HZ);
@@ -285,6 +335,7 @@ int MPU9250::mpu9250_init()
 
 	result = _writeReg(MPUREG_ACCEL_CONFIG, BITS_ACCEL_CONFIG_16G);
 
+	usleep(25000);
 	if (result != 0) {
 		DF_LOG_ERR("Accel scale config failed");
 	}

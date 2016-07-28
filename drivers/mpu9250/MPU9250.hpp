@@ -45,6 +45,12 @@ namespace DriverFramework
 #define MPUREG_SELF_TEST_Y_ACCEL	0x0E
 #define MPUREG_SELF_TEST_Z_ACCEL	0x0F
 #define MPUREG_WHOAMI			0x75
+#define MPUREG_X_OFFS_USR_H		0x13
+#define MPUREG_X_OFFS_USR_L		0x14
+#define MPUREG_Y_OFFS_USR_H		0x15
+#define MPUREG_Y_OFFS_USR_L		0x16
+#define MPUREG_Z_OFFS_USR_H		0x17
+#define MPUREG_Z_OFFS_USR_L		0x18
 #define MPUREG_SMPLRT_DIV		0x19
 #define MPUREG_CONFIG			0x1A
 #define MPUREG_GYRO_CONFIG		0x1B
@@ -103,6 +109,12 @@ namespace DriverFramework
 #define MPUREG_FIFO_COUNTH		0x72
 #define MPUREG_FIFO_COUNTL		0x73
 #define MPUREG_FIFO_R_W			0x74
+#define MPUREG_XA_OFFS_H		0x77
+#define MPUREG_XA_OFFS_L		0x78
+#define MPUREG_YA_OFFS_H		0x7A
+#define MPUREG_YA_OFFS_L		0x7B
+#define MPUREG_ZA_OFFS_H		0x7D
+#define MPUREG_ZA_OFFS_L		0x7E
 
 // Length of the FIFO used by the sensor to buffer unread
 // sensor data.
@@ -296,6 +308,8 @@ private:
 	void clear_int_status();
 
 	void self_test(float *deviation);
+
+	void set_offsets();
 
 	float _last_temp_c;
 	bool _temp_initialized;
