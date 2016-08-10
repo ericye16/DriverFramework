@@ -96,6 +96,7 @@ void MPU9250::set_offsets()
 
 }
 
+// set the offset registers 
 void MPU9250::calibrate_flat()
 {
 	uint8_t data[12];
@@ -107,6 +108,7 @@ void MPU9250::calibrate_flat()
 		aAvg[0] += (int16_t)(((int16_t)data[0] << 8) | data[1]) ;
 		aAvg[1] += (int16_t)(((int16_t)data[2] << 8) | data[3]) ;
 		aAvg[2] += (int16_t)(((int16_t)data[4] << 8) | data[5]) ;
+		usleep(1000);
 	}
 	aAvg[0] /= 200;
 	aAvg[1] /= 200;
@@ -134,19 +136,21 @@ void MPU9250::calibrate_flat()
 
 	DF_LOG_ERR("accel_bias_reg: %i, %i, %i", accel_bias_reg[0], accel_bias_reg[1], accel_bias_reg[2]);
 	DF_LOG_ERR("aAvg: %i, %i, %i", aAvg[0], aAvg[1], aAvg[2]);
+	DF_LOG_ERR("mask_bit: %i, %i, %i", mask_bit[0], mask_bit[1], mask_bit[2]);
+	usleep(1000);
 	accel_bias_reg[0] -= aAvg[0];
 	accel_bias_reg[1] -= aAvg[1];
 	accel_bias_reg[2] -= aAvg[2];
 
 	data[0] = (accel_bias_reg[0] >> 8) & 0xFF;
 	data[1] = (accel_bias_reg[0]) & 0xFF;
-	// data[1] = data[1] | mask_bit[0];
+	data[1] = data[1] | mask_bit[0];
 	data[2] = (accel_bias_reg[1] >> 8) & 0xFF;
 	data[3] = (accel_bias_reg[1]) & 0xFF;
-	// data[3] = data[3] | mask_bit[1];
+	data[3] = data[3] | mask_bit[1];
 	data[4] = (accel_bias_reg[2] >> 8) & 0xFF;
 	data[5] = (accel_bias_reg[2]) & 0xFF;
-	// data[5] = data[5] | mask_bit[2];
+	data[5] = data[5] | mask_bit[2];
 
 	_writeReg(MPUREG_XA_OFFS_H, data[0]);
 	_writeReg(MPUREG_XA_OFFS_L, data[1]);
@@ -427,7 +431,7 @@ int MPU9250::mpu9250_init()
 	}
 
 
-	calibrate_flat();
+	// calibrate_flat();
 
 	usleep(1000);
 	// Enable/clear the FIFO of any residual data
