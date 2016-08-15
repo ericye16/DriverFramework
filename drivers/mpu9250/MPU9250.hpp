@@ -312,6 +312,7 @@ private:
 	void calibrate_flat();
 
 	void set_offsets();
+	void read_offsets();
 
 	float _last_temp_c;
 	bool _temp_initialized;

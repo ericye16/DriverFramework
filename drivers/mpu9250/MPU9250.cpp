@@ -47,6 +47,21 @@
 
 using namespace DriverFramework;
 
+void MPU9250::read_offsets()
+{
+	int16_t accel_offsets[3] = {};
+	_bulkRead(MPUREG_XA_OFFS_H, (uint8_t *)&accel_offsets[0], 2);
+	_bulkRead(MPUREG_YA_OFFS_H, (uint8_t *)&accel_offsets[1], 2);
+	_bulkRead(MPUREG_ZA_OFFS_H, (uint8_t *)&accel_offsets[2], 2);
+
+	accel_offsets[0] = swap16(accel_offsets[0]);
+	accel_offsets[1] = swap16(accel_offsets[1]);
+	accel_offsets[2] = swap16(accel_offsets[2]);
+	DF_LOG_ERR("accel_offsets[0] = %i", accel_offsets[0]);
+	DF_LOG_ERR("accel_offsets[1] = %i", accel_offsets[1]);
+	DF_LOG_ERR("accel_offsets[2] = %i", accel_offsets[2]);
+}
+
 void MPU9250::set_offsets()
 {
 	int16_t accel_offsets[3] = {};
@@ -409,6 +424,10 @@ int MPU9250::mpu9250_init()
 	if (result != 0) {
 		DF_LOG_ERR("Accel scale config2 failed");
 	}
+
+	usleep(1000);
+
+	read_offsets();
 
 	usleep(1000);
 
